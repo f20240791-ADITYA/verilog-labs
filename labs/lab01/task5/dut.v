@@ -17,8 +17,8 @@ module dut(
 
   // ---- For comparison, copy the required file(s) into this folder and
   //      uncomment ONE of the options below at a time (matching Task 4) ----
-   rca64 U_IMPL (.a(a), .b(b), .cin(cin), .sum(sum), .cout(cout));
-  // cla64_flat U_IMPL (.a(a), .b(b), .cin(cin), .sum(sum), .cout(cout));
+   //rca64 U_IMPL (.a(a), .b(b), .cin(cin), .sum(sum), .cout(cout));
+   cla64_flat U_IMPL (.a(a), .b(b), .cin(cin), .sum(sum), .cout(cout));
   // cla64_blocked U_IMPL (.a(a), .b(b), .cin(cin), .sum(sum), .cout(cout));
 
 endmodule
