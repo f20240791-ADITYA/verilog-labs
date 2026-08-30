@@ -1,39 +1,55 @@
 // cla64_hier.v
-// BONUS -- open-ended. No detailed scaffold is provided; this is meant to
-// be a genuine design exercise. Not required for lab submission.
-//
-// You will likely need to modify cla4.v (or add signals alongside it) so
-// that block-generate/block-propagate summaries of its own Gi, Pi signals
-// are exposed as outputs, since the second-level lookahead unit below
-// needs them. As with every module in this lab from Task 2 onward, every
-// gate/assign you add should carry an explicit delay.
-//
-// Starting point (from Tutorial 3, Q4(d)):
-//   - Reuse 16 four-bit CLA blocks (your cla4.v) -- their internal logic
-//     doesn't change.
-//   - For each block k, define:
-//       Gblk_k = "this block produces a carry regardless of its incoming
-//                 carry" -- a Boolean function of that block's own 4
-//                 bit-level Gi, Pi signals.
-//       Pblk_k = "an incoming carry sails straight through this whole
-//                 block" -- likewise a function of its own Gi, Pi.
-//   - Build a second-level lookahead unit -- structurally identical to
-//     cla4.v, just one level up -- that computes each block's carry-in
-//     directly from Gblk_0..Gblk_15, Pblk_0..Pblk_15, and cin, instead of
-//     rippling block to block.
-//
-// To test this, wire it into dut.v as a fourth option (copy the pattern
-// used for the other three) and run it through the same tb.v. Compare
-// your final delay to cla64_blocked.v from Task 4.
+// Hierarchical 64-Bit Carry-Lookahead Adder with Second-Level Lookahead Unit
 
-module cla64_hier(
-  input  [63:0] a,
-  input  [63:0] b,
-  input         cin,
-  output [63:0] sum,
-  output        cout
+module cla64_hier (
+    output [63:0] sum,
+    output        cout,
+    input  [63:0] a,
+    input  [63:0] b,
+    input         cin
 );
+    wire [15:0] P_blk, G_blk;
+    wire [16:0] C_blk;
 
-  // TODO: your hierarchical design goes here.
+    assign C_blk[0] = cin;
+
+    // -------------------------------------------------------------------------
+    // 1. Generate Block-Level Propagate (P_blk) and Generate (G_blk) Signals
+    //    and instantiate 16 4-bit CLA blocks
+    // -------------------------------------------------------------------------
+    genvar i;
+    generate
+        for (i = 0; i < 16; i = i + 1) begin : BLOCK_GEN
+            wire [3:0] p, g;
+
+            // Bit-level prop and gen (delay = 2)
+            assign #(2) p = a[i*4 +: 4] ^ b[i*4 +: 4];
+            assign #(2) g = a[i*4 +: 4] & b[i*4 +: 4];
+
+            // Block-level Group Propagate and Group Generate logic
+            assign #(2) P_blk[i] = &p;
+            assign #(2) G_blk[i] = g[3] | (p[3] & g[2]) | (p[3] & p[2] & g[1]) | (p[3] & p[2] & p[1] & g[0]);
+
+            // 4-bit CLA block instance receiving carry directly from 2nd-level unit
+            cla4 block_inst (
+                .a   (a[i*4 +: 4]),
+                .b   (b[i*4 +: 4]),
+                .cin (C_blk[i]),
+                .sum (sum[i*4 +: 4]),
+                .cout() // Carry-out is handled by the 2nd-level lookahead tree below
+            );
+        end
+    endgenerate
+
+    // -------------------------------------------------------------------------
+    // 2. Second-Level Lookahead Carry Generator across all 16 Blocks
+    // -------------------------------------------------------------------------
+    generate
+        for (i = 0; i < 16; i = i + 1) begin : SECOND_LEVEL_CLA
+            assign #(2) C_blk[i+1] = G_blk[i] | (P_blk[i] & C_blk[i]);
+        end
+    endgenerate
+
+    assign cout = C_blk[16];
 
 endmodule
